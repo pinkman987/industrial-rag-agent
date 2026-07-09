@@ -198,7 +198,7 @@ TOP_K=4
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=rag_user
-MYSQL_PASSWORD=rag_password
+MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=industrial_rag
 ```
 
@@ -794,3 +794,107 @@ http://127.0.0.1:8000
 前端只通过 HTTP 请求访问已有 FastAPI 接口，不直接调用后端内部函数，不直接连接 MySQL，不直接调用 DeepSeek 或智谱 API。该页面仅用于本地演示和面试展示。
 
 以下为项目早期 README 内容，保留作为历史阶段说明。
+# 最终项目展示说明
+
+本项目当前已经完成阶段一到阶段五的核心内容：RAG 知识库问答、MySQL 业务数据层、Function Calling 工具调用、故障诊断与 Markdown 报告生成、Streamlit 前端演示和 GitHub 展示材料整理。
+
+## 最终项目能力总览
+
+- 普通 RAG 知识库问答，支持 `answer` 和 `sources` 返回。
+- MySQL 业务数据查询，支持设备、报警、维修和历史记录。
+- Function Calling 工具问答，支持 `tool_calls` 可观测展示。
+- 故障诊断分析，整合知识库、设备台账、报警记录和维修记录。
+- Markdown 诊断报告生成，支持 `report_id` 和 `report_markdown` 返回。
+- 诊断报告保存和历史查询，支持按 `report_id` 和 `session_id` 追溯。
+- Streamlit 本地前端演示，覆盖主要后端能力。
+
+## 后端启动方式
+
+```powershell
+cd G:\AI_projects\industrial_rag_agent
+.\.venv\Scripts\Activate.ps1
+python scripts/init_db.py
+uvicorn app.main:app --reload
+```
+
+Swagger 入口：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## 前端启动方式
+
+另开一个终端：
+
+```powershell
+cd G:\AI_projects\industrial_rag_agent
+.\.venv\Scripts\Activate.ps1
+python -m streamlit run frontend/streamlit_app.py
+```
+
+Streamlit 演示入口由命令行输出为准，默认后端地址为：
+
+```text
+http://127.0.0.1:8000
+```
+
+## 推荐演示问题
+
+```text
+SV300伺服电机出现E-05报警应该怎么排查？
+```
+
+```text
+SV300伺服电机出现E-05报警，结合历史报警和维修记录应该怎么排查？
+```
+
+```text
+CONV_A1输送线频繁过载，应该怎么诊断？
+```
+
+```text
+SV300伺服电机出现E-05报警，请生成一份诊断报告。
+```
+
+```text
+锅炉水位异常，请生成一份诊断报告。
+```
+
+## 主要接口清单
+
+- `POST /api/chat/ask`
+- `POST /api/chat/ask-with-tools`
+- `GET /api/chat/history/{session_id}`
+- `GET /api/devices`
+- `GET /api/devices/{device_code}`
+- `GET /api/devices/{device_code}/alarms`
+- `GET /api/devices/{device_code}/maintenance`
+- `POST /api/diagnosis/analyze`
+- `POST /api/diagnosis/report`
+- `GET /api/diagnosis/reports/{report_id}`
+- `GET /api/diagnosis/reports/session/{session_id}`
+
+## 文档目录说明
+
+- `docs/stage1_acceptance.md`：阶段一 RAG 验收文档。
+- `docs/stage2_acceptance.md`：阶段二 MySQL 业务数据验收文档。
+- `docs/stage3_acceptance.md`：阶段三 Function Calling 验收文档。
+- `docs/stage4_acceptance.md`：阶段四故障诊断和报告生成验收文档。
+- `docs/project_architecture.md`：项目架构说明。
+- `docs/demo_guide.md`：项目演示指南。
+- `docs/github_publish_checklist.md`：GitHub 发布检查清单。
+- `docs/final_project_summary.md`：项目最终总结。
+- `docs/interview_notes.md`：面试讲解笔记。
+- `docs/resume_description.md`：简历项目描述。
+
+## GitHub 使用注意事项
+
+- 不要提交 `.env`。
+- 不要提交 `.venv`。
+- 不要提交 `data/chroma`、`data/uploads`、`data/chroma_old`。
+- 不要提交真实 API Key 或真实数据库密码。
+- `.env.example` 只保留占位符。
+- 使用前复制 `.env.example` 为 `.env`，再填写自己的 DeepSeek、智谱 Embedding 和 MySQL 配置。
+
+---

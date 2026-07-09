@@ -231,7 +231,7 @@ docker compose up -d
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=rag_user
-MYSQL_PASSWORD=rag_password
+MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=industrial_rag
 ```
 
@@ -245,7 +245,7 @@ MySQL 容器配置了健康检查，等待 MySQL 就绪后再执行初始化脚�
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=rag_user
-MYSQL_PASSWORD=rag_password
+MYSQL_PASSWORD=your_mysql_password
 MYSQL_DATABASE=industrial_rag
 ```
 
