@@ -13,3 +13,5 @@ pypdf
 python-docx
 SQLAlchemy
 PyMySQL
+streamlit
+requests

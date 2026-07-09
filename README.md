@@ -738,7 +738,7 @@ python -m compileall app scripts tests
 
 - LangGraph
 - 复杂多轮 Agent
-- Streamlit 前端
+- 生产级前端工程和部署
 - 权限系统
 - PDF 导出
 - 复杂报表导出
@@ -749,12 +749,48 @@ python -m compileall app scripts tests
 
 阶段五建议聚焦项目展示和求职材料：
 
-- 增加 Streamlit 或轻量前端演示页面。
+- 完善 Streamlit 演示页面、接口截图和项目展示材料。
 - 整理接口演示截图。
 - 继续完善 README 和 GitHub 展示材料。
 - 补充部署说明。
 - 将简历项目描述和面试话术进一步压缩成投递版本。
 
 ---
+
+## 阶段五第一批：Streamlit前端演示页面
+
+当前项目已新增轻量级 Streamlit 前端，用于本地演示阶段一到阶段四的后端能力。
+
+前端文件位置：
+
+```text
+frontend/streamlit_app.py
+frontend/README.md
+```
+
+启动方式：
+
+```powershell
+uvicorn app.main:app --reload
+streamlit run frontend/streamlit_app.py
+```
+
+使用时需要先启动 FastAPI 后端，再启动 Streamlit 前端。前端默认调用：
+
+```text
+http://127.0.0.1:8000
+```
+
+前端支持：
+
+- RAG 知识库问答。
+- Function Calling 工具问答和 `tool_calls` 展示。
+- 故障诊断分析和 `evidence` 展示。
+- Markdown 诊断报告生成。
+- 按 `report_id` 查询单份报告。
+- 按 `session_id` 查询报告列表。
+- 查询设备基础信息、报警记录和维修记录。
+
+前端只通过 HTTP 请求访问已有 FastAPI 接口，不直接调用后端内部函数，不直接连接 MySQL，不直接调用 DeepSeek 或智谱 API。该页面仅用于本地演示和面试展示。
 
 以下为项目早期 README 内容，保留作为历史阶段说明。

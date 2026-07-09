@@ -11,7 +11,7 @@ class StageTwoDatabaseContractTests(unittest.TestCase):
         self.assertIn("SQLAlchemy", requirements)
         self.assertIn("PyMySQL", requirements)
 
-        banned_dependencies = {"mysqlclient", "langgraph", "streamlit"}
+        banned_dependencies = {"mysqlclient", "langgraph"}
         lower_requirements = {item.strip().lower() for item in requirements}
         self.assertTrue(banned_dependencies.isdisjoint(lower_requirements))
 
@@ -20,8 +20,8 @@ class StageTwoDatabaseContractTests(unittest.TestCase):
         expected_lines = [
             "MYSQL_HOST=127.0.0.1",
             "MYSQL_PORT=3306",
-            "MYSQL_USER=rag_user",
-            "MYSQL_PASSWORD=rag_password",
+            "MYSQL_USER=your_mysql_user",
+            "MYSQL_PASSWORD=your_mysql_password",
             "MYSQL_DATABASE=industrial_rag",
         ]
 
