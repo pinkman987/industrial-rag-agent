@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic-settings
+python-multipart
+langchain
+langchain-openai
+langchain-chroma
+langchain-text-splitters
+chromadb
+openai
+pypdf
+python-docx
+SQLAlchemy
+PyMySQL
