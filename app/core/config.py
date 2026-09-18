@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     sample_docs_dir: Path = Path("data/sample_docs")
 
     similarity_threshold: float = 0.35
+    offline_similarity_threshold: float = 0.18
+    offline_fallback_enabled: bool = True
     chunk_size: int = 700
     chunk_overlap: int = 100
     top_k: int = 4

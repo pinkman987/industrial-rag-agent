@@ -38,8 +38,16 @@ def search_knowledge_base(query: str, top_k: Optional[int] = None) -> list:
     from app.core.config import get_settings
 
     settings = get_settings()
-    vector_store = get_vector_store()
-    docs_with_distance = vector_store.similarity_search_with_score(query, k=top_k or settings.top_k)
+    resolved_top_k = top_k or settings.top_k
+    try:
+        vector_store = get_vector_store()
+        docs_with_distance = vector_store.similarity_search_with_score(query, k=resolved_top_k)
+    except Exception:
+        if not settings.offline_fallback_enabled:
+            raise
+        from app.rag.local_search import search_sample_documents_locally
+
+        return search_sample_documents_locally(query, top_k=resolved_top_k)
 
     results = []
     for document, distance in docs_with_distance:
@@ -49,6 +57,7 @@ def search_knowledge_base(query: str, top_k: Optional[int] = None) -> list:
                 "content": document.page_content,
                 "metadata": metadata,
                 "similarity_score": distance_to_similarity_score(distance),
+                "retrieval_mode": "chroma_embedding",
             }
         )
     return sorted(results, key=lambda item: item["similarity_score"], reverse=True)

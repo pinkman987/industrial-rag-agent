@@ -14,6 +14,7 @@
 - **故障诊断流程编排**：整合知识库、设备台账、历史报警和维修记录为 `evidence`，生成结构化诊断结论。
 - **Markdown 报告与历史追溯**：生成报告后持久化到 MySQL，支持按 `report_id` 或 `session_id` 查询。
 - **Streamlit 演示前端**：只通过 HTTP 调用 FastAPI，集中展示问答、诊断、报告和设备数据查询。
+- **本地离线兜底**：Embedding 或 Chat 服务不可用时，使用样例文档完成关键词检索和可追溯的抽取式回答，并明确标注为离线演示模式。
 
 ## 项目阶段
 
@@ -156,6 +157,8 @@ Copy-Item .env.example .env
 ```env
 CHAT_API_KEY=your_deepseek_api_key
 EMBEDDING_API_KEY=your_zhipu_api_key
+OFFLINE_FALLBACK_ENABLED=true
+OFFLINE_SIMILARITY_THRESHOLD=0.18
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=your_mysql_user
@@ -166,6 +169,10 @@ MYSQL_DATABASE=industrial_rag
 不要将真实 API Key、数据库密码或本地 `.env` 提交到 GitHub。
 
 ## 本地运行
+
+### Windows 一键启动
+
+环境和依赖准备完成后，可以直接双击项目根目录的 `启动工业RAG网页.cmd`。脚本会启动 FastAPI、启动 Streamlit，并自动打开 `http://127.0.0.1:8501`。使用网页期间请保留两个最小化的服务窗口；关闭服务窗口后，本地网址将无法访问。
 
 ### 1. 启动 MySQL
 

@@ -2,7 +2,15 @@ NO_EVIDENCE_PREFIX = "知识库未找到直接依据，以下仅为通用排查�
 
 
 def filter_reliable_results(results: list, threshold: float) -> list:
-    return [item for item in results if item.get("similarity_score", 0) >= threshold]
+    from app.core.config import get_settings
+
+    offline_threshold = get_settings().offline_similarity_threshold
+    return [
+        item
+        for item in results
+        if item.get("similarity_score", 0)
+        >= (offline_threshold if item.get("retrieval_mode") == "local_keyword" else threshold)
+    ]
 
 
 def build_no_evidence_answer(question: str) -> str:
@@ -66,6 +74,25 @@ def _call_llm(question: str, reliable_results: list) -> str:
     return getattr(response, "content", str(response))
 
 
+def build_offline_extract_answer(question: str, reliable_results: list) -> str:
+    """Build a traceable demo answer when the configured chat API is unavailable."""
+    evidence = []
+    for index, result in enumerate(reliable_results[:4], start=1):
+        metadata = result.get("metadata", {})
+        lines = [line.strip() for line in result.get("content", "").splitlines() if line.strip()]
+        excerpt = " ".join(lines[:6])[:500]
+        evidence.append(f"{index}. {excerpt}（来源：{metadata.get('file_name', '未知文件')}）")
+    return (
+        "当前为本地离线演示回答：外部模型服务不可用，以下内容直接摘取自本地知识库，"
+        "未进行大模型扩写。\n\n"
+        f"问题：{question}\n\n"
+        "检索依据：\n"
+        + "\n".join(evidence)
+        + "\n\n建议按照上述文档中的故障原因、排查步骤和安全要求逐项核对；"
+        "涉及带电、旋转或高温部件时，应先停机并执行现场安全规程。"
+    )
+
+
 def answer_question(question: str) -> dict:
     from app.core.config import get_settings
     from app.rag.vector_store import search_knowledge_base
@@ -81,8 +108,23 @@ def answer_question(question: str) -> dict:
             "sources": [],
         }
 
+    local_retrieval = any(item.get("retrieval_mode") == "local_keyword" for item in reliable_results)
+    try:
+        answer = _call_llm(question, reliable_results)
+        offline_generation = False
+    except Exception:
+        if not settings.offline_fallback_enabled:
+            raise
+        answer = build_offline_extract_answer(question, reliable_results)
+        offline_generation = True
+
+    message = (
+        "外部模型或向量服务不可用，已使用本地离线演示模式。"
+        if local_retrieval or offline_generation
+        else "已基于知识库检索结果生成回答。"
+    )
     return {
-        "message": "已基于知识库检索结果生成回答。",
-        "answer": _call_llm(question, reliable_results),
+        "message": message,
+        "answer": answer,
         "sources": build_sources(reliable_results),
     }

@@ -22,8 +22,8 @@ def build_embedding_kwargs(settings) -> dict:
     }
     if settings.embedding_base_url:
         kwargs["base_url"] = settings.embedding_base_url
+    kwargs["check_embedding_ctx_length"] = False
     return kwargs
-
 
 def get_chat_model():
     """Create the chat model lazily so health checks can run without an API key."""
