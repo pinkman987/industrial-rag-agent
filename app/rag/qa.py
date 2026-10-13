@@ -1,4 +1,8 @@
+import logging
+
 NO_EVIDENCE_PREFIX = "知识库未找到直接依据，以下仅为通用排查建议"
+
+logger = logging.getLogger(__name__)
 
 
 def filter_reliable_results(results: list, threshold: float) -> list:
@@ -115,14 +119,20 @@ def answer_question(question: str) -> dict:
     except Exception:
         if not settings.offline_fallback_enabled:
             raise
+        # 显式告警：离线兜底会掩盖外部模型故障，必须记录日志便于排查
+        logger.warning(
+            "外部模型服务不可用，已切换本地离线演示模式。问题：%s",
+            question,
+        )
         answer = build_offline_extract_answer(question, reliable_results)
         offline_generation = True
 
-    message = (
-        "外部模型或向量服务不可用，已使用本地离线演示模式。"
-        if local_retrieval or offline_generation
-        else "已基于知识库检索结果生成回答。"
-    )
+    if offline_generation:
+        message = "外部模型服务不可用，已使用本地离线演示模式。"
+    elif local_retrieval:
+        message = "已结合本地关键词检索结果生成回答。"
+    else:
+        message = "已基于知识库检索结果生成回答。"
     return {
         "message": message,
         "answer": answer,

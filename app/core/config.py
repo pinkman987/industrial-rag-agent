@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("data/uploads")
     sample_docs_dir: Path = Path("data/sample_docs")
 
+    # 检索相似度阈值。口径说明：Chroma 返回的是 L2 距离，
+    # 代码统一用 distance_to_similarity_score = 1/(1+distance) 换算为 0~1 得分
+    #（distance=0 → 1.0；0.35 对应距离约 1.86）。
+    # 注意：对外文档（如个人简历）曾写作 0.52，属旧口径，与代码不一致，已更正为 0.35。
     similarity_threshold: float = 0.35
+    # 本地关键词检索（local_keyword 模式）使用的离线阈值
     offline_similarity_threshold: float = 0.18
     offline_fallback_enabled: bool = True
     chunk_size: int = 700

@@ -45,7 +45,7 @@ class StageThreeToolsContractTests(unittest.TestCase):
         settings = SimpleNamespace(top_k=4, similarity_threshold=0.8)
         with patch.object(rag_tools, "get_settings", return_value=settings), patch.object(
             rag_tools, "_search_knowledge_base", return_value=[]
-        ):
+        ), patch.object(rag_tools, "_local_keyword_fallback", return_value=[]):
             result = rag_tools.search_knowledge_base("锅炉水位异常怎么处理？")
 
         self.assertIsInstance(result, dict)
@@ -53,6 +53,27 @@ class StageThreeToolsContractTests(unittest.TestCase):
         self.assertEqual(result["tool_name"], "search_knowledge_base")
         self.assertEqual(result["sources"], [])
         self.assertEqual(result["summary"], "知识库未检索到高于阈值的可靠依据。")
+
+    def test_rag_tool_uses_keyword_fallback_when_embedding_has_no_reliable_hits(self):
+        from app.tools import rag_tools
+
+        settings = SimpleNamespace(top_k=4, similarity_threshold=0.8)
+        local_hits = [
+            {
+                "content": "SV300伺服电机E-05报警通常与过载有关。",
+                "metadata": {"file_name": "SV300_servo_manual.txt", "page": None, "chunk_index": 0},
+                "similarity_score": 0.3,
+                "retrieval_mode": "local_keyword",
+            }
+        ]
+        with patch.object(rag_tools, "get_settings", return_value=settings), patch.object(
+            rag_tools, "_search_knowledge_base", return_value=[]
+        ), patch.object(rag_tools, "_local_keyword_fallback", return_value=local_hits):
+            result = rag_tools.search_knowledge_base("SV300伺服电机E-05报警怎么处理？")
+
+        self.assertEqual(result["success"], True)
+        self.assertEqual(len(result["sources"]), 1)
+        self.assertIn("本地关键词兜底检索", result["summary"])
 
     def test_db_tools_return_dicts_with_required_fields(self):
         from app.tools import db_tools

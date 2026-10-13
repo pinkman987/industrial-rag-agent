@@ -2,20 +2,37 @@ import json
 from typing import Optional
 from uuid import uuid4
 
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
+
 from app.tools.tool_executor import execute_tool_call
 from app.tools.tool_specs import TOOL_SPECS
+
+# 多轮工具调用的最大轮数（成本护栏：防止模型反复调用工具）
+MAX_TOOL_ROUNDS = 2
 
 
 def ask_with_tools(question: str, session_id: Optional[str] = None, device_code: Optional[str] = None) -> dict:
     resolved_session_id = session_id or str(uuid4())
 
-    selected_calls = _select_tools_with_model(question, device_code)
-    if not selected_calls:
-        selected_calls = _select_tools_by_keywords(question, device_code)
+    try:
+        tool_call_records, loop_answer = _run_tool_loop(
+            question, device_code
+        )
+    except Exception:
+        tool_call_records, loop_answer = [], ""
 
-    tool_call_records = [execute_tool_call(tool_name, arguments) for tool_name, arguments in selected_calls]
     sources = _collect_sources(tool_call_records)
-    answer = _generate_final_answer(question, tool_call_records)
+
+    if loop_answer and loop_answer.strip():
+        # 模型在工具闭环中直接给出了最终回答
+        answer = loop_answer
+    else:
+        answer = _generate_final_answer(question, tool_call_records)
 
     return {
         "message": "已基于工具调用结果生成回答。",
@@ -24,6 +41,92 @@ def ask_with_tools(question: str, session_id: Optional[str] = None, device_code:
         "tool_calls": [_public_tool_call(record) for record in tool_call_records],
         "session_id": resolved_session_id,
     }
+
+
+def _run_tool_loop(question: str, device_code: Optional[str]) -> tuple:
+    """标准 Function Calling 多轮闭环。
+
+    流程：模型选择工具 -> 执行工具 -> 工具结果以 tool 消息（带 tool_call_id）
+    回传给模型 -> 模型基于结果继续调用或直接作答；最多 MAX_TOOL_ROUNDS 轮。
+    模型不可用/不支持工具绑定时，降级为关键词选择兜底（保持原有行为）。
+
+    返回 (tool_call_records, final_answer_or_empty)。
+    """
+    records = []
+    try:
+        from app.core.llm import get_chat_model
+
+        model = get_chat_model()
+        messages = [
+            SystemMessage(
+                "你是工业设备运维助手。请根据用户问题选择并调用工具；"
+                "可以多轮调用工具，直到获得足够信息后直接给出最终回答，"
+                "不要编造工具结果。"
+            ),
+            HumanMessage(
+                "用户问题：{question}\n设备编码：{device_code}".format(
+                    question=question,
+                    device_code=device_code or "未提供",
+                )
+            ),
+        ]
+
+        calls = _select_tools_with_model(question, device_code)
+        if not calls:
+            calls = _select_tools_by_keywords(question, device_code)
+
+        if not hasattr(model, "bind_tools"):
+            raise RuntimeError("当前模型不支持工具绑定")
+
+        bound_model = model.bind_tools(TOOL_SPECS)
+
+        for _ in range(MAX_TOOL_ROUNDS):
+            if not calls:
+                break
+
+            for tool_name, arguments in calls:
+                record = execute_tool_call(tool_name, arguments)
+                records.append(record)
+                tool_call_id = str(uuid4())
+                messages.append(
+                    AIMessage(
+                        content="",
+                        tool_calls=[{
+                            "name": tool_name,
+                            "args": arguments,
+                            "id": tool_call_id,
+                            "type": "function",
+                        }],
+                    )
+                )
+                messages.append(
+                    ToolMessage(
+                        content=json.dumps(
+                            record.get("result", {}),
+                            ensure_ascii=False,
+                            default=str,
+                        ),
+                        tool_call_id=tool_call_id,
+                    )
+                )
+
+            response = bound_model.invoke(messages)
+            calls = [
+                (call["name"], call["args"])
+                for call in _extract_tool_calls_full(response)
+            ]
+            if not calls:
+                return records, str(
+                    getattr(response, "content", "") or ""
+                )
+
+        return records, ""
+    except Exception:
+        selected = _select_tools_by_keywords(question, device_code)
+        return [
+            execute_tool_call(tool_name, arguments)
+            for tool_name, arguments in selected
+        ], ""
 
 
 def _select_tools_with_model(question: str, device_code: Optional[str]) -> list:
@@ -35,7 +138,7 @@ def _select_tools_with_model(question: str, device_code: Optional[str]) -> list:
             (
                 "system",
                 "你是工业设备运维助手。请根据用户问题选择最有帮助的工具。"
-                "只做一次工具选择，不要进行多轮规划。",
+                "只输出本轮需要的工具调用，不要编造工具结果。",
             ),
             (
                 "user",
@@ -52,6 +155,45 @@ def _select_tools_with_model(question: str, device_code: Optional[str]) -> list:
         return _normalize_selected_calls(_extract_tool_calls(response), question, device_code)
     except Exception:
         return []
+
+
+def _extract_tool_calls_full(response) -> list:
+    """提取带 id 的工具调用，供多轮闭环回传 tool 消息使用。
+
+    返回 [{"name": str, "args": dict, "id": str}]；id 缺失时自动生成。
+    """
+    tool_calls = getattr(response, "tool_calls", None)
+    if tool_calls:
+        extracted = []
+        for call in tool_calls:
+            if not isinstance(call, dict):
+                continue
+            name = call.get("name") or call.get("tool_name")
+            args = call.get("args") or call.get("arguments") or {}
+            if name:
+                extracted.append({
+                    "name": name,
+                    "args": args,
+                    "id": call.get("id") or str(uuid4()),
+                })
+        return extracted
+
+    additional_kwargs = getattr(response, "additional_kwargs", {}) or {}
+    raw_tool_calls = additional_kwargs.get("tool_calls") or []
+    extracted = []
+    for call in raw_tool_calls:
+        if not isinstance(call, dict):
+            continue
+        function = call.get("function", {}) or {}
+        name = function.get("name")
+        arguments = function.get("arguments", {})
+        if name:
+            extracted.append({
+                "name": name,
+                "args": arguments,
+                "id": call.get("id") or str(uuid4()),
+            })
+    return extracted
 
 
 def _extract_tool_calls(response) -> list:
