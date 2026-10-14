@@ -81,6 +81,7 @@ class StageThreeFunctionCallingContractTests(unittest.TestCase):
 
     def test_tool_chat_fallback_returns_answer_sources_tool_calls_and_session_id(self):
         from app.tools import tool_chat
+        from app.core import llm
 
         fake_calls = [
             {
@@ -93,7 +94,7 @@ class StageThreeFunctionCallingContractTests(unittest.TestCase):
             }
         ]
 
-        with patch.object(tool_chat, "_select_tools_with_model", return_value=[]), patch.object(
+        with patch.object(llm, "get_chat_model", side_effect=RuntimeError("model unavailable")), patch.object(
             tool_chat, "_select_tools_by_keywords", return_value=[("query_device_info", {"device_code": "CNC-X200"})]
         ), patch.object(tool_chat, "execute_tool_call", return_value=fake_calls[0]), patch.object(
             tool_chat, "_generate_final_answer", return_value="CNC_X200设备基础信息如下。"

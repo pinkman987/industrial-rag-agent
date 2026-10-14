@@ -10,6 +10,7 @@ class Source(BaseModel):
     chunk_index: Optional[int] = None
     similarity_score: float
     content_preview: str
+    retrieval_mode: Optional[str] = None
 
 
 class UploadResponse(BaseModel):

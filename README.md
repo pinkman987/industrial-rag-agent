@@ -37,6 +37,8 @@
 - `POST /api/chat/ask-with-tools` 返回普通回答、来源和可观测的 `tool_calls`。
 - 工具问答为标准 **Function Calling 多轮闭环**：模型选择工具 → 执行 → 工具结果以 `role=tool` 消息（带 `tool_call_id`）回传 → 模型基于结果继续调用或直接作答（最多 2 轮）；模型不可用/不支持工具绑定时降级为关键词选择。
 - 工具调用记录会保存到聊天历史，便于后续查询和调试。
+- 每轮统一解析 JSON 工具参数，保留模型原始调用 ID；同一请求内相同工具与参数复用结果。后续模型请求失败时保留已完成的记录和来源，仅在尚无工具结果时使用关键词兜底。
+- `sources[].retrieval_mode` 返回 `chroma_embedding` 或 `local_keyword`；历史记录没有该字段时兼容为 `null`，得分须按对应检索模式理解。
 
 ### 阶段四：故障诊断与诊断报告
 
@@ -258,6 +260,8 @@ python -m unittest discover
 python -m compileall app scripts tests frontend
 ```
 
+`tests/test_tool_loop_reliability.py` 覆盖真实 LangChain 消息类型下的多轮调用、原始 JSON 参数、调用 ID、重复查询缓存、工具成功后的模型超时、并行工具消息、非法参数反馈、直接回答和轮数上限。外部模型、数据库调用使用测试替身，不等同于线上联调。
+
 接口的真实联调可通过 Swagger 和 Streamlit 完成。阶段四报告与历史查询对应合同测试：
 
 - `tests/test_stage_four_diagnosis_contract.py`
@@ -293,6 +297,7 @@ python -m compileall app scripts tests frontend
 
 ## 更新记录
 
+- **2026-10-14**：修复工具循环异常丢失既有结果及第二轮 JSON 字符串参数失败；每轮保留调用 ID 和 assistant 消息，缓存相同查询，支持模型直接回答；来源模式保留到 API schema；补充回归测试并标注历史阶段文档。
 - **2026-10-13**：
   - Function Calling 升级为**多轮闭环**（tool 消息回传 + `tool_call_id` 对齐，`MAX_TOOL_ROUNDS=2`），并保留关键词兜底；
   - 知识库检索增加**本地关键词兜底补检**：稠密检索无可靠命中时自动补检样例文档并标注来源模式；

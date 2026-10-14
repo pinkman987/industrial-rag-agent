@@ -39,6 +39,7 @@ def _source_from_result(result: dict) -> dict:
         "chunk_index": metadata.get("chunk_index"),
         "similarity_score": round(float(result.get("similarity_score", 0)), 4),
         "content_preview": preview,
+        "retrieval_mode": result.get("retrieval_mode"),
     }
 
 
